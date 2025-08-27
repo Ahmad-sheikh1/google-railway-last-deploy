@@ -27,7 +27,7 @@ const Scrapper_google_bot = async (req, res) => {
 
     async function collectHrefs() {
       return await page
-        .locator(`${FEED} ${CARD} a.hfpxzc`)
+        .locator(`${FEED} ${CARD} a.hfpxzc`).waitFor()
         .evaluateAll(a => a.map(x => x.getAttribute('href') || '').filter(Boolean));
     }
 
@@ -50,19 +50,19 @@ const Scrapper_google_bot = async (req, res) => {
       await p.goto(href, { waitUntil: "domcontentloaded" });
 
       const nameLoc = p.locator('h1.DUwDvf.lfPIob');
-      await nameLoc.waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
+      await nameLoc.waitFor({ state: "visible", timeout: 150000 }).catch(() => {});
       const name = await nameLoc.innerText().catch(() => '');
 
       const phoneLoc = p.locator('button[data-item-id*="phone:tel"]');
-      await phoneLoc.waitFor({ state: "attached", timeout: 10000 }).catch(() => {});
+      await phoneLoc.waitFor({ state: "attached", timeout: 100000 }).catch(() => {});
       const phone = await phoneLoc.innerText().catch(() => '');
 
       const addressLoc = p.locator('.Io6YTe.fontBodyMedium.kR99db').first();
-      await addressLoc.waitFor({ state: "attached", timeout: 10000 }).catch(() => {});
+      await addressLoc.waitFor({ state: "attached", timeout: 100000 }).catch(() => {});
       const address = await addressLoc.innerText().catch(() => '');
 
       const websiteLoc = p.locator('a[data-item-id*="authority"]');
-      await websiteLoc.waitFor({ state: "attached", timeout: 10000 }).catch(() => {});
+      await websiteLoc.waitFor({ state: "attached", timeout: 100000 }).catch(() => {});
       const website = await websiteLoc.getAttribute('href').catch(() => '');
 
       await p.close();
@@ -74,13 +74,13 @@ const Scrapper_google_bot = async (req, res) => {
 
     for (const cat of categories) {
       const searchBox = page.locator(".searchboxinput");
-      await searchBox.waitFor({ state: "visible", timeout: 20000 });
+      await searchBox.waitFor({ state: "visible", timeout: 100000 });
       await searchBox.click();
       await searchBox.fill(`${cat} in USA`);
       await searchBox.press("Enter");
 
       const feedLoc = page.locator(FEED);
-      await feedLoc.waitFor({ state: "visible", timeout: 30000 });
+      await feedLoc.waitFor({ state: "visible", timeout: 300000 });
 
       console.log(`Processing : ${cat}`);
       await scrollFeed(4, 1000, 250);
