@@ -1,14 +1,14 @@
-const {chromium} = require("playwright")
-const categories = ["Restaurants", "Salons", "Gyms", "Contractors", "Auto Repair", "Clinics"];
+const { chromium } = require("playwright");
+const categories = ["Restaurants"];
 
 const FEED = '.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde.ecceSd[role="feed"]';
 const CARD = '.Nv2PK.THOPZb:has(> a.hfpxzc)';
 
- const Scrapper_google_bot = async (req, res) => {
-  console.log("Enter")
+const Scrapper_google_bot = async (req, res) => {
+  console.log("Enter");
   let browser;
   try {
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({ headless: false });
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto("https://www.google.com/maps");
@@ -49,10 +49,21 @@ const CARD = '.Nv2PK.THOPZb:has(> a.hfpxzc)';
       const p = await context.newPage();
       await p.goto(href, { waitUntil: "domcontentloaded" });
 
-      const name    = await p.locator('h1.DUwDvf.lfPIob').innerText().catch(() => '');
-      const phone   = await p.locator('button[data-item-id*="phone:tel"]').innerText().catch(() => '');
-      const address = await p.locator('.Io6YTe.fontBodyMedium.kR99db').first().innerText().catch(() => '');
-      const website = await p.locator('a[data-item-id*="authority"]').getAttribute('href').catch(() => '');
+      const nameLoc = p.locator('h1.DUwDvf.lfPIob');
+      await nameLoc.waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
+      const name = await nameLoc.innerText().catch(() => '');
+
+      const phoneLoc = p.locator('button[data-item-id*="phone:tel"]');
+      await phoneLoc.waitFor({ state: "attached", timeout: 10000 }).catch(() => {});
+      const phone = await phoneLoc.innerText().catch(() => '');
+
+      const addressLoc = p.locator('.Io6YTe.fontBodyMedium.kR99db').first();
+      await addressLoc.waitFor({ state: "attached", timeout: 10000 }).catch(() => {});
+      const address = await addressLoc.innerText().catch(() => '');
+
+      const websiteLoc = p.locator('a[data-item-id*="authority"]');
+      await websiteLoc.waitFor({ state: "attached", timeout: 10000 }).catch(() => {});
+      const website = await websiteLoc.getAttribute('href').catch(() => '');
 
       await p.close();
       return { name, phone, address, website, link: href };
@@ -62,12 +73,15 @@ const CARD = '.Nv2PK.THOPZb:has(> a.hfpxzc)';
 
     for (const cat of categories) {
       const searchBox = page.locator(".searchboxinput");
+      await searchBox.waitFor({ state: "visible", timeout: 20000 });
       await searchBox.click();
       await searchBox.fill(`${cat} in USA`);
       await searchBox.press("Enter");
 
-      await page.locator(FEED).waitFor();
-      console.log(`Processing : ${cat}`)
+      const feedLoc = page.locator(FEED);
+      await feedLoc.waitFor({ state: "visible", timeout: 30000 });
+
+      console.log(`Processing : ${cat}`);
       await scrollFeed(4, 1000, 250);
 
       const hrefs = await getUpToTargetHrefs(50);
@@ -79,7 +93,7 @@ const CARD = '.Nv2PK.THOPZb:has(> a.hfpxzc)';
     }
 
     await browser.close();
-    console.log("End")
+    console.log("End");
     return res.status(200).json({ ok: true, total: results.length, results });
   } catch (err) {
     if (browser) await browser.close().catch(() => {});
@@ -87,8 +101,6 @@ const CARD = '.Nv2PK.THOPZb:has(> a.hfpxzc)';
   }
 };
 
-
-
 module.exports = {
-    Scrapper_google_bot
-}
+  Scrapper_google_bot
+};
