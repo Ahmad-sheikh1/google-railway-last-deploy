@@ -8,7 +8,7 @@ const CARD = '.Nv2PK.THOPZb:has(> a.hfpxzc)';
   console.log("Enter")
   let browser;
   try {
-    browser = await chromium.launch({ headless: false });
+    browser = await chromium.launch({ headless: true });
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto("https://www.google.com/maps");
