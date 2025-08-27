@@ -8,7 +8,7 @@ const Scrapper_google_bot = async (req, res) => {
   console.log("Enter");
   let browser;
   try {
-    browser = await chromium.launch({ headless: false });
+    browser = await chromium.launch({ headless: true });
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto("https://www.google.com/maps");
@@ -66,6 +66,7 @@ const Scrapper_google_bot = async (req, res) => {
       const website = await websiteLoc.getAttribute('href').catch(() => '');
 
       await p.close();
+      console.log(name, phone, address, website,  href )
       return { name, phone, address, website, link: href };
     }
 
