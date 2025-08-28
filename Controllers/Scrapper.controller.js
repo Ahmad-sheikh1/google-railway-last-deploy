@@ -3,8 +3,8 @@ const categories = ["Restaurants"];
 
 const FEED = '.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde.ecceSd[role="feed"]';
 const CARD = '.Nv2PK.THOPZb:has(> a.hfpxzc)';
-const { cloudinary , uploadBufferToCloudinary } = require("../Configurations/Cloudinary.config")
-const nowStamp = () => new Date().toISOString().replace(/[:.]/g,'-');
+const { cloudinary, uploadBufferToCloudinary } = require("../Configurations/Cloudinary.config")
+const nowStamp = () => new Date().toISOString().replace(/[:.]/g, '-');
 
 const Scrapper_google_bot = async (req, res) => {
   console.log("Enter");
@@ -13,7 +13,11 @@ const Scrapper_google_bot = async (req, res) => {
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext();
     const page = await context.newPage();
-    await page.goto("https://www.google.com/maps");
+    await page.goto('https://www.google.com/maps?hl=en&gl=US', { waitUntil: 'domcontentloaded' });
+
+    if (!page.url() !== "https://www.google.com/maps") {
+
+    }
 
     async function scrollFeed(times = 8, px = 1000, delayMs = 300) {
       await page.evaluate(async ({ FEED, times, px, delayMs }) => {
