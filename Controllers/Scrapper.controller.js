@@ -6,18 +6,53 @@ const CARD = '.Nv2PK.THOPZb:has(> a.hfpxzc)';
 const { cloudinary, uploadBufferToCloudinary } = require("../Configurations/Cloudinary.config")
 const nowStamp = () => new Date().toISOString().replace(/[:.]/g, '-');
 
+
+
 const Scrapper_google_bot = async (req, res) => {
   console.log("Enter");
   let browser;
+
+
   try {
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({ headless: false });
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto('https://www.google.com/maps?hl=en&gl=US', { waitUntil: 'domcontentloaded' });
 
-    if (!page.url() !== "https://www.google.com/maps") {
+    async function acceptGoogleConsentEnglish(page) {
+      // Heading on EN page: "Before you continue to Google"
+      const isConsentEN =
+        (await page.getByText(/Before you continue to Google/i).count()) > 0 ||
+        /consent\.google\.com/i.test(page.url());
 
+      if (!isConsentEN) return; // not the EN consent page
+
+      // try top-level page first
+      const acceptBtnTop = page.getByRole('button', { name: /^Accept all$/i });
+      if (await acceptBtnTop.count()) {
+        await acceptBtnTop.first().click().catch(() => { });
+        await page.waitForLoadState('domcontentloaded').catch(() => { });
+        return;
+      }
+
+      // fallback: sometimes in an iframe from consent.google.com
+      const consentFrame = page.frames().find(f => /consent\.google\.com/i.test(f.url()));
+      if (consentFrame) {
+        const acceptBtnFrame = consentFrame.getByRole('button', { name: /^Accept all$/i });
+        if (await acceptBtnFrame.count()) {
+          await acceptBtnFrame.first().click().catch(() => { });
+          await page.waitForLoadState('domcontentloaded').catch(() => { });
+        }
+      }
     }
+
+    acceptGoogleConsentEnglish(page)
+
+    if (!/google\.com\/maps/i.test(page.url())) {
+      await page.goto('https://www.google.com/maps?hl=en&gl=US', { waitUntil: 'domcontentloaded' });
+    }
+
+
 
     async function scrollFeed(times = 8, px = 1000, delayMs = 300) {
       await page.evaluate(async ({ FEED, times, px, delayMs }) => {
