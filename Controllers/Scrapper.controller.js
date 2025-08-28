@@ -3,6 +3,8 @@ const categories = ["Restaurants"];
 
 const FEED = '.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde.ecceSd[role="feed"]';
 const CARD = '.Nv2PK.THOPZb:has(> a.hfpxzc)';
+const { cloudinary , uploadBufferToCloudinary } = require("../Configurations/Cloudinary.config")
+const nowStamp = () => new Date().toISOString().replace(/[:.]/g,'-');
 
 const Scrapper_google_bot = async (req, res) => {
   console.log("Enter");
@@ -27,7 +29,7 @@ const Scrapper_google_bot = async (req, res) => {
 
     async function collectHrefs() {
       return await page
-        .locator(`${FEED} ${CARD} a.hfpxzc`).waitFor()
+        .locator(`${FEED} ${CARD} a.hfpxzc`)
         .evaluateAll(a => a.map(x => x.getAttribute('href') || '').filter(Boolean));
     }
 
@@ -50,33 +52,59 @@ const Scrapper_google_bot = async (req, res) => {
       await p.goto(href, { waitUntil: "domcontentloaded" });
 
       const nameLoc = p.locator('h1.DUwDvf.lfPIob');
-      await nameLoc.waitFor({ state: "visible", timeout: 150000 }).catch(() => {});
+      await nameLoc.waitFor({ state: "visible", timeout: 150000 }).catch(() => { });
       const name = await nameLoc.innerText().catch(() => '');
+      // await page.screenshot({ path: `Screenshoots/screenshot-${nameLoc}.png` });
+
 
       const phoneLoc = p.locator('button[data-item-id*="phone:tel"]');
-      await phoneLoc.waitFor({ state: "attached", timeout: 100000 }).catch(() => {});
+      await phoneLoc.waitFor({ state: "attached", timeout: 100000 }).catch(() => { });
       const phone = await phoneLoc.innerText().catch(() => '');
+      // await page.screenshot({ path: `Screenshoots/screenshot-${phoneLoc}.png` });
+
 
       const addressLoc = p.locator('.Io6YTe.fontBodyMedium.kR99db').first();
-      await addressLoc.waitFor({ state: "attached", timeout: 100000 }).catch(() => {});
+      await addressLoc.waitFor({ state: "attached", timeout: 100000 }).catch(() => { });
       const address = await addressLoc.innerText().catch(() => '');
 
       const websiteLoc = p.locator('a[data-item-id*="authority"]');
-      await websiteLoc.waitFor({ state: "attached", timeout: 100000 }).catch(() => {});
+      await websiteLoc.waitFor({ state: "attached", timeout: 100000 }).catch(() => { });
       const website = await websiteLoc.getAttribute('href').catch(() => '');
 
       await p.close();
-      console.log(name, phone, address, website,  href )
+      console.log(name, phone, address, website, href)
       return { name, phone, address, website, link: href };
     }
 
     const results = [];
 
     for (const cat of categories) {
+      const buffer = await page.screenshot({ path: 'Screenshoots/screenshot-before-boxinut.png' });
+
+      const res = await uploadBufferToCloudinary(buffer, {
+        folder: 'Screenshoots',
+        public_id: `screenshot-before-boxinut.png`,
+        tags: ['playwright', 'env:prod'],
+        context: { page: 'home', suite: 'smoke' },
+        transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+      });
+
       const searchBox = page.locator(".searchboxinput");
       await searchBox.waitFor({ state: "visible", timeout: 100000 });
       await searchBox.click();
       await searchBox.fill(`${cat} in USA`);
+      const buffer2 = await page.screenshot({ path: 'Screenshoots/screenshot-after-boxinut.png' });
+
+
+      const res2 = await uploadBufferToCloudinary(buffer2, {
+        folder: 'Screenshoots',
+        public_id: `screenshot-after-boxinut.png`,
+        tags: ['playwright', 'env:prod'],
+        context: { page: 'home', suite: 'smoke' },
+        transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+      });
+
+
       await searchBox.press("Enter");
 
       const feedLoc = page.locator(FEED);
@@ -97,7 +125,7 @@ const Scrapper_google_bot = async (req, res) => {
     console.log("End");
     return res.status(200).json({ ok: true, total: results.length, results });
   } catch (err) {
-    if (browser) await browser.close().catch(() => {});
+    if (browser) await browser.close().catch(() => { });
     return res.status(500).json({ ok: false, error: err?.message || "Unknown error" });
   }
 };
