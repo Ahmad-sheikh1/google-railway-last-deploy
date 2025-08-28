@@ -21,15 +21,25 @@ const Scrapper_google_bot = async (req, res) => {
 
     const buffer = await page.screenshot({ path: 'Screenshoots/screenshot-before-boxinut.png' });
 
+    const res = await uploadBufferToCloudinary(buffer, {
+      folder: 'Screenshoots',
+      public_id: `screenshot-first-boxinut${new Date()}.png`,
+      tags: ['playwright', 'env:prod'],
+      context: { page: 'home', suite: 'smoke' },
+      transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+    });
+
+    async function acceptGoogleConsentEnglish(page) {
+
+      const buffer = await page.screenshot({ path: 'Screenshoots/acceptGoogleConsentEnglish-boxinut.png' });
+
       const res = await uploadBufferToCloudinary(buffer, {
         folder: 'Screenshoots',
-        public_id: `screenshot-first-boxinut${new Date()}.png`,
+        public_id: `acceptGoogleConsentEnglish${new Date()}.png`,
         tags: ['playwright', 'env:prod'],
         context: { page: 'home', suite: 'smoke' },
         transformation: [{ quality: 'auto', fetch_format: 'auto' }],
       });
-
-    async function acceptGoogleConsentEnglish(page) {
       // Heading on EN page: "Before you continue to Google"
       const isConsentEN =
         (await page.getByText(/Before you continue to Google/i).count()) > 0 ||
@@ -62,7 +72,15 @@ const Scrapper_google_bot = async (req, res) => {
       await page.goto('https://www.google.com/maps?hl=en&gl=US', { waitUntil: 'domcontentloaded' });
     }
 
+    const buffer2 = await page.screenshot({ path: 'Screenshoots/screenshot-before-boxinut.png' });
 
+    const res2 = await uploadBufferToCloudinary(buffer, {
+      folder: 'Screenshoots',
+      public_id: `wtf${new Date()}.png`,
+      tags: ['playwright', 'env:prod'],
+      context: { page: 'home', suite: 'smoke' },
+      transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+    });
 
     async function scrollFeed(times = 8, px = 1000, delayMs = 300) {
       await page.evaluate(async ({ FEED, times, px, delayMs }) => {
