@@ -14,7 +14,7 @@ const Scrapper_google_bot = async (req, res) => {
 
 
   try {
-    browser = await chromium.launch({ headless: false });
+    browser = await chromium.launch({ headless: true });
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto('https://www.google.com/maps?hl=en&gl=US', { waitUntil: 'domcontentloaded' });
