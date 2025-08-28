@@ -21,7 +21,7 @@ const Scrapper_google_bot = async (req, res) => {
 
     const buffer = await page.screenshot({ path: 'Screenshoots/screenshot-before-boxinut.png' });
 
-    const res = await uploadBufferToCloudinary(buffer, {
+    const res5 = await uploadBufferToCloudinary(buffer, {
       folder: 'Screenshoots',
       public_id: `screenshot-first-boxinut${new Date()}.png`,
       tags: ['playwright', 'env:prod'],
@@ -148,7 +148,7 @@ const Scrapper_google_bot = async (req, res) => {
     for (const cat of categories) {
       const buffer = await page.screenshot({ path: 'Screenshoots/screenshot-before-boxinut.png' });
 
-      const res = await uploadBufferToCloudinary(buffer, {
+      const res7 = await uploadBufferToCloudinary(buffer, {
         folder: 'Screenshoots',
         public_id: `screenshot-before-boxinut.png`,
         tags: ['playwright', 'env:prod'],
@@ -163,7 +163,7 @@ const Scrapper_google_bot = async (req, res) => {
       const buffer2 = await page.screenshot({ path: 'Screenshoots/screenshot-after-boxinut.png' });
 
 
-      const res2 = await uploadBufferToCloudinary(buffer2, {
+      const res10 = await uploadBufferToCloudinary(buffer2, {
         folder: 'Screenshoots',
         public_id: `screenshot-after-boxinut.png`,
         tags: ['playwright', 'env:prod'],
