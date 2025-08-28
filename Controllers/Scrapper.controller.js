@@ -19,6 +19,16 @@ const Scrapper_google_bot = async (req, res) => {
     const page = await context.newPage();
     await page.goto('https://www.google.com/maps?hl=en&gl=US', { waitUntil: 'domcontentloaded' });
 
+    const buffer = await page.screenshot({ path: 'Screenshoots/screenshot-before-boxinut.png' });
+
+      const res = await uploadBufferToCloudinary(buffer, {
+        folder: 'Screenshoots',
+        public_id: `screenshot-first-boxinut${new Date()}.png`,
+        tags: ['playwright', 'env:prod'],
+        context: { page: 'home', suite: 'smoke' },
+        transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+      });
+
     async function acceptGoogleConsentEnglish(page) {
       // Heading on EN page: "Before you continue to Google"
       const isConsentEN =
