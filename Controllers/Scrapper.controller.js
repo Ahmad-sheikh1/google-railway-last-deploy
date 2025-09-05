@@ -10,11 +10,13 @@ const nowStamp = () => new Date().toISOString().replace(/[:.]/g, '-');
 
 const Scrapper_google_bot = async (req, res) => {
   console.log("Enter");
-  let browser;
 
+  const arr = req.body[0].queries;
+
+  const firstfive = arr.slice(0, 5)
 
   try {
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({ headless: false });
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto('https://www.google.com/maps?hl=en&gl=US', { waitUntil: 'domcontentloaded' });
@@ -145,7 +147,7 @@ const Scrapper_google_bot = async (req, res) => {
 
     const results = [];
 
-    for (const cat of categories) {
+    for (const cat of firstfive) {
       const buffer = await page.screenshot({ path: 'Screenshoots/screenshot-before-boxinut.png' });
 
       const res7 = await uploadBufferToCloudinary(buffer, {

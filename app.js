@@ -3,6 +3,8 @@ const app = express();
 const cors = require("cors");
 const PORT = 5000;
 const scrapedroute = require("./Routes/Scrapping.route")
+const downloadroutes = require("./Routes/Download_Routes")
+
 
 // Middlewares
 app.use(cors({
@@ -10,12 +12,13 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
-  }));
-  
-  
-app.use("/Api/Scrap", scrapedroute)
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use("/Api/Scrap", scrapedroute)
+app.use("/Api/Download", downloadroutes)
+
 
 
 // Testing Api
