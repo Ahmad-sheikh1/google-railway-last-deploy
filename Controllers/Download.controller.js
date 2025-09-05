@@ -206,7 +206,12 @@ const YoutubeDownloadControllerV2LatestVersion02 = async (req, res) => {
         const outDirAbs = path.resolve(__dirname, "../youtube");
         if (!fs.existsSync(outDirAbs)) fs.mkdirSync(outDirAbs, { recursive: true });
 
-        const outputPath = norm(path.join(outDirAbs, "video.mp4"));
+        const uniqueName = `video-${Date.now()}.mp4`;
+
+        const outputPath = norm(path.join(outDirAbs, uniqueName));
+
+        const fileName = path.basename(outputPath);
+        const key = `youtube/${fileName}`;
 
         // Remove any prior file to avoid 416 range issues
         if (fs.existsSync(outputPath)) await fs.promises.unlink(outputPath);
@@ -250,9 +255,6 @@ const YoutubeDownloadControllerV2LatestVersion02 = async (req, res) => {
         if (!fs.existsSync(outputPath)) {
             throw new Error("yt-dlp did not write the expected file (progressive MP4).");
         }
-
-        const fileName = path.basename(outputPath); // "video.mp4"
-        const key = `youtube/${fileName}`;
 
         const { s3url } = await uploadFileToS3(outputPath, key);
         await fs.promises.unlink(outputPath);
