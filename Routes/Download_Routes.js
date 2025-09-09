@@ -7,7 +7,8 @@ const {
     YoutubeDownloadControllerV2LatestVersion02,
     YoutubeVideoDownoaderv3withMetaOptions,
     InstaDownloadControllerV3Latest,
-    FacebookVideoDownloaderv1
+    FacebookVideoDownloaderv1,
+    XVideoDownloaderV1WithMeta
 } = require("../Controllers/Download.controller")
 
 
@@ -15,6 +16,7 @@ const {
 router.post("/insta", InstaDownloadControllerV3Latest);
 router.post("/youtube", YoutubeVideoDownoaderv3withMetaOptions);
 router.post("/facebook", FacebookVideoDownloaderv1);
+router.post("/x", XVideoDownloaderV1WithMeta);
 
 
 

@@ -588,4 +588,150 @@ const FacebookVideoDownloaderv1 = async (req, res) => {
     }
 }
 
-module.exports = { FacebookVideoDownloaderv1, YoutubeVideoDownoaderv3withMetaOptions, InstaDownloadControllerV3Latest, InstaDownloadControllerV2Latest, YoutubeDownloadControllerV2Latest, YoutubeDownloadControllerV2LatestVersion02 };
+
+ const XVideoDownloaderV1WithMeta = async (req, res) => {
+    try {
+        let { url } = req.body;
+        if (!url) return res.status(400).json({ ok: false, error: "Missing url" });
+
+        // Normalize common X/Twitter URL forms
+        // Accepts https://x.com/{user}/status/{id} OR https://twitter.com/{user}/status/{id}
+        try {
+            const u = new URL(url);
+            if (
+                (u.hostname.includes("x.com") || u.hostname.includes("twitter.com")) &&
+                u.pathname.includes("/status/")
+            ) {
+                // keep as-is
+            } else {
+                // Best-effort: if it's a share URL or mobile, try to coerce host
+                if (u.hostname.includes("mobile.twitter.com")) {
+                    u.hostname = "twitter.com";
+                    url = u.toString();
+                }
+            }
+        } catch { /* ignore */ }
+
+        const outDirAbs = path.resolve(__dirname, "../x");
+        if (!fs.existsSync(outDirAbs)) fs.mkdirSync(outDirAbs, { recursive: true });
+
+        const uniqueName = `xvideo-${Date.now()}.mp4`;
+        const outputPath = norm(path.join(outDirAbs, uniqueName));
+        const fileName = path.basename(outputPath);
+        const key = `x/${fileName}`;
+
+        // Clean pre-existing file (rare but safe)
+        if (fs.existsSync(outputPath)) await fs.promises.unlink(outputPath);
+
+        // Optional cookies for protected/age-gated/region-limited tweets
+        const COOKIES_PATH = path.resolve(__dirname, "../twittercookies.txt");
+        const hasCookies = fs.existsSync(COOKIES_PATH);
+
+        if (hasCookies) {
+            const st = await fs.promises.stat(COOKIES_PATH);
+            console.log("COOKIES_PATH =", COOKIES_PATH, true);
+            console.log("cookie size =", st.size);
+        } else {
+            console.warn("No cookies file found. Some tweets may fail without login.");
+        }
+
+        // 1) Fetch metadata (tweet text, author, etc.) without downloading media
+        const metaOpts = {
+            dumpSingleJson: true,   // -j
+            skipDownload: true,     // --skip-download
+            noWarnings: true,
+            noCallHome: true,
+            addHeader: [
+                "User-Agent: Mozilla/5.0",
+                "Referer: https://x.com/",
+            ],
+            cookies: hasCookies ? COOKIES_PATH : undefined,
+        };
+
+        const metaStdout = await youtubedl(url, metaOpts);
+        const j = typeof metaStdout === "string" ? JSON.parse(metaStdout) : metaStdout;
+
+        // Extract caption & hashtags
+        const caption = (j.description || "").trim();
+        const hashtags = Array.from(
+            new Set(
+                (caption.match(/#\w+/g) || []).map(h => h.trim())
+            )
+        );
+
+        const meta = {
+            id: j.id,
+            url: j.webpage_url || url,
+            title: j.title || "",                // often "Tweet by @handle"
+            caption,
+            hashtags,
+            author_handle: j.uploader_id || "",  // e.g., "@jack"
+            author_name: j.uploader || "",
+            author_url: j.uploader_url || "",
+            duration_seconds: j.duration ?? null,
+            upload_date: j.upload_date || null,  // YYYYMMDD
+            thumbnail: j.thumbnail || "",
+            thumbnails: j.thumbnails || [],
+            like_count: j.like_count ?? null,    // may be null if extractor can't fetch
+            repost_count: j.repost_count ?? null // field availability can vary
+        };
+
+        // 2) Download best quality and ensure a single MP4 output
+        // On X, many videos are HLS/DASH. Let yt-dlp handle merge/remux to MP4.
+        // Requires ffmpeg available on PATH.
+        const dlOpts = {
+            // Prefer best combo or single best mp4; fallback to best overall then recode to mp4
+            f: "bv*+ba/b[ext=mp4]/b",
+            mergeOutputFormat: "mp4",         // --merge-output-format mp4
+            // If your yt-dlp uses --recode-video instead (older), you can use:
+            // recodeVideo: "mp4",
+            noPlaylist: true,
+            maxDownloads: 1,
+            playlistItems: "1",
+            noPart: true,
+            noProgress: true,
+            restrictFilenames: true,
+            forceOverwrites: true,
+            noContinue: true,
+            output: outputPath,
+            addHeader: [
+                "User-Agent: Mozilla/5.0",
+                "Referer: https://x.com/",
+            ],
+            cookies: hasCookies ? COOKIES_PATH : undefined,
+            // ignoreConfig: true, // uncomment if a local yt-dlp config causes conflicts
+        };
+
+        try {
+            await youtubedl(url, dlOpts);
+        } catch (err) {
+            // Some builds can throw even after successful write; verify file
+            if (!(err && fs.existsSync(outputPath))) throw err;
+        }
+
+        if (!fs.existsSync(outputPath)) {
+            throw new Error("yt-dlp did not produce an MP4 file for this tweet.");
+        }
+
+        // 3) Upload to S3 & cleanup
+        const { s3url } = await uploadFileToS3(outputPath, key);
+        await fs.promises.unlink(outputPath);
+
+        return res.status(200).json({
+            ok: true,
+            msg: "Downloaded → Uploaded to S3 → Local deleted",
+            key,
+            s3url,
+            metadata: meta,
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ ok: false, error: error.message });
+    }
+};
+
+
+
+
+
+module.exports = { XVideoDownloaderV1WithMeta, FacebookVideoDownloaderv1, YoutubeVideoDownoaderv3withMetaOptions, InstaDownloadControllerV3Latest, InstaDownloadControllerV2Latest, YoutubeDownloadControllerV2Latest, YoutubeDownloadControllerV2LatestVersion02 };
