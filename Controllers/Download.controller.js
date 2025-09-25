@@ -3,7 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const youtubedl = require('yt-dlp-exec');
 const { Upload } = require("@aws-sdk/lib-storage");
-const { s3, uploadFileToS3 } = require("../Configurations/s3.config");
+const { s3, uploadFileToS3 , uploadImageToS3 } = require("../Configurations/s3.config");
+const { URL } = require("url");
+const mime = require("mime-types");
+const { fileTypeFromBuffer } = require("file-type");
 
 function norm(p) {
     return p.replace(/\\/g, "/");
@@ -589,7 +592,7 @@ const FacebookVideoDownloaderv1 = async (req, res) => {
 }
 
 
- const XVideoDownloaderV1WithMeta = async (req, res) => {
+const XVideoDownloaderV1WithMeta = async (req, res) => {
     try {
         let { url } = req.body;
         if (!url) return res.status(400).json({ ok: false, error: "Missing url" });
@@ -730,8 +733,196 @@ const FacebookVideoDownloaderv1 = async (req, res) => {
     }
 };
 
+const LinkedinVideoDownloaderv1 = async (req, res) => {
+    try {
+
+        let { url } = req.body;
+        if (!url) return res.status(400).json({ ok: false, error: "Missing url" });
+
+        try {
+            const u = new URL(url);
+            if (u.hostname.includes("lnkd.in")) {
+            }
+            if (u.hostname.includes("m.linkedin.com")) {
+                u.hostname = "www.linkedin.com";
+                url = u.toString();
+            }
+        } catch {
+            // ignore parse issues; yt-dlp may still handle raw string
+        }
+
+        const outDirAbs = path.resolve(__dirname, "../linkedin");
+        if (!fs.existsSync(outDirAbs)) fs.mkdirSync(outDirAbs, { recursive: true });
+
+        const uniqueName = `linkedin-video-${Date.now()}.mp4`;
+        const outputPath = norm(path.join(outDirAbs, uniqueName));
+        const fileName = path.basename(outputPath);
+        const key = `linkedin/${fileName}`;
+
+        if (fs.existsSync(outputPath)) await fs.promises.unlink(outputPath);
+
+        // 3) Optional cookies (for private/member-only/company-gated videos)
+        //   Make a Netscape cookie jar at ../linkedincookies.txt if needed.
+        const COOKIES_PATH = path.resolve(__dirname, "../linkedincookies.txt");
+        const hasCookies = fs.existsSync(COOKIES_PATH);
+
+        if (hasCookies) {
+            const st = await fs.promises.stat(COOKIES_PATH);
+            console.log("COOKIES_PATH =", COOKIES_PATH, true);
+            console.log("cookie size =", st.size);
+        } else {
+            console.warn(
+                "No LinkedIn cookies file found. Public videos may work; private/member-only will likely fail."
+            );
+        }
+
+        const metaOpts = {
+            dumpSingleJson: true,
+            skipDownload: true,
+            noWarnings: true,
+            noCallHome: true,
+            forceGenericExtractor: true,
+            addHeader: [
+                "User-Agent: Mozilla/5.0",
+                "Referer: https://www.linkedin.com/",
+            ],
+            cookies: hasCookies ? COOKIES_PATH : undefined,
+        };
+
+        let metaRaw;
+
+        try {
+            metaRaw = await youtubedl(url, metaOpts);
+        } catch (e) {
+            // If meta fails without cookies, tell user to try with cookies
+            if (!hasCookies) {
+                throw new Error(
+                    "LinkedIn metadata fetch failed without cookies. Try again with a cookies file (linkedincookies.txt)."
+                );
+            }
+            throw e;
+        }
+
+        const j = typeof metaRaw === "string" ? JSON.parse(metaRaw) : metaRaw;
+
+        const caption = (j.description || "").trim();
+        const hashtags = Array.from(new Set((caption.match(/#\w+/g) || []).map(h => h.trim())));
+
+        const meta = {
+            id: j.id,
+            url: j.webpage_url || url,
+            title: j.title || "",
+            caption,
+            hashtags,
+            author_name: j.uploader || "",
+            author_url: j.uploader_url || "",
+            duration_seconds: j.duration ?? null,
+            upload_date: j.upload_date || null, // YYYYMMDD if available
+            thumbnail: j.thumbnail || "",
+            thumbnails: j.thumbnails || [],
+            like_count: j.like_count ?? null,
+            view_count: j.view_count ?? null,
+        };
+
+        const dlOpts = {
+            f: "bv*+ba/b[ext=mp4]/b",
+            mergeOutputFormat: "mp4",
+            noPlaylist: true,
+            maxDownloads: 1,
+            playlistItems: "1",
+            noPart: true,
+            noProgress: true,
+            restrictFilenames: true,
+            forceOverwrites: true,
+            noContinue: true,
+            output: outputPath,
+            addHeader: [
+                "User-Agent: Mozilla/5.0",
+                "Referer: https://www.linkedin.com/",
+            ],
+            cookies: hasCookies ? COOKIES_PATH : undefined,
+            // ignoreConfig: true,
+        };
+
+        try {
+            await youtubedl(url, dlOpts);
+        } catch (err) {
+            // Sometimes yt-dlp throws even after writing; verify file exists
+            if (!(err && fs.existsSync(outputPath))) {
+                // If it failed without cookies, guide user
+                if (!hasCookies) {
+                    throw new Error(
+                        "LinkedIn download failed without cookies. This post may require login; supply linkedincookies.txt."
+                    );
+                }
+                throw err;
+            }
+        }
+
+        if (!fs.existsSync(outputPath)) {
+            throw new Error("yt-dlp did not produce an MP4 file for this LinkedIn URL.");
+        }
+
+
+        const { s3url } = await uploadFileToS3(outputPath, key);
+        await fs.promises.unlink(outputPath);
+
+
+        return res.status(200).json({
+            ok: true,
+            msg: "Downloaded → Uploaded to S3 → Local deleted",
+            key,
+            s3url,
+            metadata: meta,
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ ok: false, error: error.message });
+    }
+}
+
+const thumbnailsDir = path.join(__dirname, 'thumbnails');
+if (!fs.existsSync(thumbnailsDir)) {
+    fs.mkdirSync(thumbnailsDir, { recursive: true });
+}
+
+const UploadImage = async (req, res) => {
+    try {
+        const filename = req.params.filename;
+
+        console.log(req.params)
+
+        if (!filename) {
+            return res.status(400).json({
+                error: 'Filename required'
+            });
+        }
+
+        if (!req.body || req.body.length === 0) {
+            return res.status(400).json({
+                error: 'No file data'
+            });
+        }
+
+        const filePath = path.join(thumbnailsDir, filename);
+
+        fs.writeFileSync(filePath, req.body);
+        const result = await uploadImageToS3(filePath, filename);
+
+
+
+        res.status(200).json({
+            message: 'File saved successfully',
+           ...result
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ ok: false, error: err.message });
+    }
+};
 
 
 
 
-module.exports = { XVideoDownloaderV1WithMeta, FacebookVideoDownloaderv1, YoutubeVideoDownoaderv3withMetaOptions, InstaDownloadControllerV3Latest, InstaDownloadControllerV2Latest, YoutubeDownloadControllerV2Latest, YoutubeDownloadControllerV2LatestVersion02 };
+module.exports = { UploadImage, XVideoDownloaderV1WithMeta, LinkedinVideoDownloaderv1, FacebookVideoDownloaderv1, YoutubeVideoDownoaderv3withMetaOptions, InstaDownloadControllerV3Latest, InstaDownloadControllerV2Latest, YoutubeDownloadControllerV2Latest, YoutubeDownloadControllerV2LatestVersion02 };
